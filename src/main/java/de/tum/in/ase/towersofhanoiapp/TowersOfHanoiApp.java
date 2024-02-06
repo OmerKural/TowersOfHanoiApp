@@ -1,8 +1,10 @@
 package de.tum.in.ase.towersofhanoiapp;
 
 import javafx.application.Application;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Pos;
+import javafx.scene.control.ComboBox;
 import javafx.stage.Stage;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -16,15 +18,21 @@ import javafx.util.Pair;
 import java.util.ArrayList;
 import java.util.List;
 
-public class App extends Application {
+public class TowersOfHanoiApp extends Application {
 
     public static void main(String[] args) {
         launch(args);
     }
 
-    // Colors for background and disks.
-    private static final Color BACKGROUND_COLOR = Color.rgb(217, 204, 185); // 4 colors used in drawing.
-    private static final Color DISK_COLOR = Color.rgb(98, 68, 66);
+    // Colors
+    private static final Color BACKGROUND_COLOR = Color.WHITE;
+    private static final Color ROD_COLOR = Color.BLACK;
+    private static final Color DISK_COLOR = Color.RED;
+
+    // Statics
+    private static final int CANVAS_WIDTH = 800;
+    private static final int CANVAS_HEIGHT = 600;
+    private static final int DISK_HEIGHT = 14;
 
     // For drawing
     private GraphicsContext graphics;
@@ -32,8 +40,7 @@ public class App extends Application {
     // Widgets
     private Button nextStepButton;
     private Button restartButton;
-    private Label towerHeightLabel;
-    private TextField towerHeightField;
+    private ComboBox<Integer> comboBox;
 
     // Containers and the height value for the algorithm.
     private int towerHeight;
@@ -55,33 +62,40 @@ public class App extends Application {
         moves = new ArrayList<>();
         heights = new int[3];
 
-        Canvas canvas = new Canvas(430, 150);
+        Canvas canvas = new Canvas(CANVAS_WIDTH, CANVAS_HEIGHT);
         graphics = canvas.getGraphicsContext2D();
-        graphics.setFill(BACKGROUND_COLOR);
-        graphics.fillRect(0, 0, 430, 143);
+        drawBackground();
+        drawRods();
 
         nextStepButton = new Button("Next Step");
         nextStepButton.setOnAction(e -> nextStep());
+        nextStepButton.setMinSize(100, 40);
         nextStepButton.setDisable(true);
 
         restartButton = new Button("Restart");
         restartButton.setOnAction(e -> restart());
+        restartButton.setMinSize(100, 40);
         restartButton.setDisable(true);
 
-        towerHeightField = new TextField();
-        towerHeightField.setPromptText("Tower Height");
-
-        towerHeightLabel = new Label("Tower Height = ");
+        ObservableList<Integer> options = FXCollections.observableArrayList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        comboBox = new ComboBox<>(options);
+        comboBox.setMinSize(40, 40);
+        comboBox.setVisibleRowCount(3);
+        comboBox.setValue(1);
 
         Button setButton = new Button("Set Tower Height");
         setButton.setOnAction(e -> set());
+        setButton.setMinSize(100, 40);
 
-        BorderPane borderPane = new BorderPane(canvas);
-        HBox top = new HBox(towerHeightField, setButton, towerHeightLabel);
+        HBox top = new HBox(comboBox, setButton);
         top.setSpacing(10);
-        borderPane.setTop(top);
+        top.setAlignment(Pos.CENTER);
         HBox bot = new HBox(nextStepButton, restartButton);
         bot.setSpacing(10);
+        bot.setAlignment(Pos.CENTER);
+
+        BorderPane borderPane = new BorderPane(canvas);
+        borderPane.setTop(top);
         borderPane.setBottom(bot);
 
         stage.setScene(new Scene(borderPane));
@@ -89,48 +103,32 @@ public class App extends Application {
         stage.show();
     }
 
-    /**
-     * Sets the tower height.
-     */
+    // Sets the tower height.
     private void set() {
-        try {
-            towerHeight = Integer.parseInt(towerHeightField.getText());
-            towers = new int[3][towerHeight];
-            restart();
-        } catch (NumberFormatException ignored) {
-            towerHeightLabel.setText("Tower Height = ERROR");
-            nextStepButton.setDisable(true);
-            restartButton.setDisable(true);
-        } finally {
-            towerHeightField.clear();
-        }
+        towerHeight = comboBox.getValue();
+        towers = new int[3][towerHeight];
+        restart();
     }
 
-    /**
-     * Makes the next move.
-     */
+    // Makes the next move.
     private void nextStep() {
         makeMove(moves.remove(0));
+        draw();
         if (moves.isEmpty()) {
             nextStepButton.setDisable(true);
         }
     }
 
-    /**
-     * Restarts the hanoi tower, based on the last tower height input.
-     */
+    // Restarts the hanoi tower, based on the last tower height input.
     private void restart() {
         moves.clear();
         initialise();
         fillMoves(towerHeight, 0, 1, 2);
-        towerHeightLabel.setText("Tower Height = " + towerHeight);
         nextStepButton.setDisable(false);
         restartButton.setDisable(false);
     }
 
-    /**
-     * Initializes the hanoi tower, based on the last tower height input.
-     */
+    // Initializes the hanoi tower, based on the last tower height input.
     private void initialise() {
         for (int i = 0; i < towerHeight; i++) {
             towers[0][i] = towerHeight - i;
@@ -140,30 +138,24 @@ public class App extends Application {
         heights[1] = 0;
         heights[2] = 0;
 
-        // Draw background and clear screen.
-        graphics.setFill(BACKGROUND_COLOR);
-        graphics.fillRect(0, 0, 430, 143);
-        // Draw the towers disk by disk.
-        graphics.setFill(DISK_COLOR);
-        for (int t = 0; t < 3; t++) {
-            for (int i = 0; i < heights[t]; i++) {
-                int disk = towers[t][i];
-                graphics.fillRoundRect(75 + 140 * t - 5 * disk - 5, 116 - 12 * i, 10 * disk + 10, 10, 10, 10);
-            }
-        }
+        draw();
     }
 
     /**
      * The main algorithm for Hanoi Towers. The function fills the moves list, which will be later read to make the moves.
+     *
      * @param disks Number of disks.
      * @param from  Source stick
      * @param to    Target stick
      * @param spare The extra stick.
      */
     private void fillMoves(int disks, int from, int to, int spare) {
+        // Base case:
         if (disks == 1) {
             moves.add(new Pair<>(from, to));
-        } else {
+        }
+        // Recursive calls:
+        else {
             fillMoves(disks - 1, from, spare, to);
             moves.add(new Pair<>(from, to));
             fillMoves(disks - 1, spare, to, from);
@@ -171,28 +163,56 @@ public class App extends Application {
     }
 
     /**
-     * Makes the provided move visually.
+     * Makes the move and changes the containers accordingly.
      * @param move Move to be made.
      */
     private void makeMove(Pair<Integer, Integer> move) {
         int source = move.getKey();
         int target = move.getValue();
         int moveDisk = towers[source][--heights[source]];
-
-        // Delete the top disk of the source stack by coloring it with the BACKGROUND_COLOR.
-        graphics.setFill(BACKGROUND_COLOR);
-        graphics.fillRoundRect(
-                75 + 140 * source - 5 * moveDisk - 6,
-                116 - 12 * heights[source] - 1, 10 * moveDisk + 12,
-                12, 10, 10);
-        // Draw the disk to the top of the target stack.
-        graphics.setFill(DISK_COLOR);
-        graphics.fillRoundRect(
-                75 + 140 * target - 5 * moveDisk - 5,
-                116 - 12 * heights[target], 10 * moveDisk + 10,
-                10, 10, 10);
-
-        // Save it to the container.
         towers[target][heights[target]++] = moveDisk;
+    }
+
+    // Helper to call all drawing methods at once.
+    private void draw() {
+        drawBackground();
+        drawRods();
+        drawDisks();
+    }
+
+    // Draw the background.
+    private void drawBackground() {
+        graphics.setFill(BACKGROUND_COLOR);
+        graphics.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
+
+    // Draw the disks.
+    private void drawDisks() {
+        int towerWidth = 2*DISK_HEIGHT;
+        int gap = (CANVAS_WIDTH - 3 * towerWidth) / 4;
+        graphics.setFill(DISK_COLOR);
+        for (int t = 0; t < 3; t++) {
+            int xPos = gap * (t + 1) + towerWidth * t;
+            for (int i = 0; i < heights[t]; i++) {
+                int disk = towers[t][i];
+                graphics.fillRoundRect(xPos - 7 * disk - 7, 350 - 20 * i, DISK_HEIGHT * disk + DISK_HEIGHT, DISK_HEIGHT, 10, 10);
+            }
+        }
+    }
+
+    // Draw the rods.
+    private void drawRods() {
+        int towerWidth = 2*DISK_HEIGHT;
+        int gap = (CANVAS_WIDTH - 3 * towerWidth) / 4;
+        int stickWidth = 10;
+        int stickHeight = 200;
+        int stickXPos = gap + stickWidth / 2 - 10;
+        int stickYPos = 150 + DISK_HEIGHT;
+        graphics.setFill(ROD_COLOR);
+        for (int i = 0; i < 3; i++) {
+            graphics.fillRoundRect(stickXPos, stickYPos + 5, stickWidth, stickHeight, 5, 5);
+            stickXPos += towerWidth + gap;
+        }
+        graphics.fillRect(0, stickYPos + stickHeight, CANVAS_WIDTH, CANVAS_HEIGHT - (stickYPos + stickHeight));
     }
 }

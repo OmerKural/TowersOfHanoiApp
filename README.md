@@ -1,11 +1,6 @@
 Towers of Hanoi App
 ===================
 
-This JavaFX application visualizes the Towers of Hanoi problem, a classic problem in computer science and mathematics.
-
-Description
------------
-
 The Towers of Hanoi involves three rods and a disks of different 
 sizes. The puzzle starts with the disks on a rod in ascending order, 
 and the goal is to move the entire 
